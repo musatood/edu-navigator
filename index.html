@@ -15,6 +15,7 @@
         background: #0f172a;
         overflow: hidden;
     }
+    body { display: flex; flex-direction: column; }
     #hubHeader {
         background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 100%);
         border-bottom: 3px solid #c5a059;
@@ -24,6 +25,7 @@
         justify-content: space-between;
         flex-wrap: wrap;
         gap: 12px;
+        flex: 0 0 auto;
     }
     #hubHeader .brand { display: flex; align-items: center; gap: 12px; }
     #hubHeader .brand .logo {
@@ -56,7 +58,7 @@
     }
     #logoutBtn:hover { background: rgba(225,29,72,0.28); }
 
-    #frameContainer { position: relative; width: 100%; height: calc(100vh - 74px); background: #f1f5f9; }
+    #frameContainer { position: relative; width: 100%; flex: 1 1 auto; min-height: 0; background: #f1f5f9; }
     .system-frame-wrap { position: absolute; inset: 0; display: none; }
     .system-frame-wrap.active { display: block; }
     .system-frame-wrap iframe { width: 100%; height: 100%; border: none; display: block; }
@@ -121,7 +123,10 @@
             <div id="hubLoginError">اسم المستخدم أو كلمة المرور غير صحيحة</div>
             <input type="text" id="hubUsername" placeholder="اسم المستخدم" autocomplete="username">
             <input type="password" id="hubPassword" placeholder="كلمة المرور" autocomplete="current-password">
-            <button onclick="hubLogin()">دخول موحّد لكل الأنظمة</button>
+            <button id="hubLoginBtn" onclick="hubLogin()">دخول موحّد لكل الأنظمة</button>
+            <p id="hubLoginStatus" style="display:none; color:#1e3a5f; font-weight:700; font-size:13px; margin-top:10px;">
+                <i class="fa-solid fa-spinner fa-spin"></i> جارٍ التحقق من بيانات الدخول...
+            </p>
             <p class="hint">هذا الدخول يُسجّلك تلقائياً في: مرصد تطوير التعليم، نظام الحوكمة CQIS، نظام جودة المناهج AIMS، ونظام تصميم وبناء المناهج والاعتماد.<br>نظام بطاقة صحة المقرر (ECHCS) لا يتطلب دخولاً أصلاً.</p>
         </div>
     </div>
@@ -178,9 +183,7 @@
         </div>
         <div class="system-frame-wrap" id="wrap-cams">
             <div class="loading-placeholder" id="loading-cams"><div class="spinner"></div><p>جاري تحميل نظام CAMS - إدارة المناهج والاعتماد الأكاديمي...</p></div>
-        </div>
-        <div class="system-frame-wrap" id="wrap-usermgmt">
-            <div class="loading-placeholder" id="loading-usermgmt"><div class="spinner"></div><p>جاري تحميل إدارة المستخدمين...</p></div>
+        <div class="system-frame-wrap" id="wrap-usermgmt"><div class="loading-placeholder" id="loading-usermgmt"><div class="spinner"></div><p>جاري تحميل إدارة المستخدمين...</p></div></div>
         </div>
     </div>
 
@@ -226,8 +229,14 @@
             const p = document.getElementById('hubPassword').value.trim();
             document.getElementById('hubLoginError').style.display = 'none';
 
+            const btn = document.getElementById('hubLoginBtn');
+            const statusEl = document.getElementById('hubLoginStatus');
+            btn.disabled = true;
+            statusEl.style.display = 'block';
+
             let loggedInUser = null, token = null;
 
+            try {
             // المحاولة الأولى: الخادم الموحّد (يدعم كل الأدوار، بما فيها رؤساء
             // الأقسام وأعضاء هيئة التدريس المُنشَأون عبر لوحة إدارة المستخدمين)
             try {
@@ -282,6 +291,10 @@
                 if (saved && HUB_SYSTEMS[saved]) initial = saved;
             } catch (e) {}
             switchHubTab(initial);
+            } finally {
+                btn.disabled = false;
+                statusEl.style.display = 'none';
+            }
         }
 
         function updateAdminTabVisibility() {
