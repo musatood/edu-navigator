@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>استبيانات الطلاب - جامعة السودان المفتوحة</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+<style>
+  body { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; background: #f1f5f9; }
+  .navbar-brand-wrap { background: linear-gradient(135deg, #0f172a, #1e3a5f); }
+  .card-custom { border: none; border-radius: 16px; box-shadow: 0 4px 16px rgba(0,0,0,0.06); }
+  .survey-card { cursor: pointer; transition: transform .15s ease, box-shadow .15s ease; }
+  .survey-card:hover { transform: translateY(-3px); box-shadow: 0 10px 28px rgba(0,0,0,0.12); }
+  .q-block { background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; }
+  .likert-label { font-size: 12px; color: #64748b; }
+  .btn-gold { background: #c5a059; color: #0f172a; font-weight: 700; border: none; }
+  .btn-gold:hover { background: #a9812f; color: #0f172a; }
+  #loadingOverlay { position: fixed; inset: 0; background: rgba(15,23,42,0.85); z-index: 9999; display: flex; align-items: center; justify-content: center; color: #fff; flex-direction: column; gap: 14px; }
+  .spinner-border { width: 3rem; height: 3rem; }
+  .step-hidden { display: none; }
+</style>
+</head>
+<body>
+
+  <div id="loadingOverlay">
+    <div class="spinner-border text-warning" role="status"></div>
+    <p class="fw-bold m-0">جاري تحميل الاستبيانات المتاحة...</p>
+  </div>
+
+  <nav class="navbar navbar-dark navbar-brand-wrap py-3 mb-4">
+    <div class="container-fluid px-4">
+      <span class="navbar-brand fw-bold d-flex align-items-center gap-2 mb-0">
+        <i class="bi bi-mortarboard-fill text-warning fs-3"></i>
+        <span>جامعة السودان المفتوحة — استبيانات الطلاب</span>
+      </span>
+    </div>
+  </nav>
+
+  <div class="container pb-5" style="max-width: 760px;">
+
+    <!-- الخطوة 1: اختيار الاستبيان -->
+    <div id="step-list">
+      <div class="text-center mb-4">
+        <h4 class="fw-bold text-primary">شاركنا رأيك — استبيانات مخصصة للطلاب</h4>
+        <p class="text-muted">اختر الاستبيان الذي يناسبك. الإجابات <strong>مجهولة تماماً</strong> ولا تُربط باسمك.</p>
+      </div>
+      <div id="surveysGrid" class="row"></div>
+    </div>
+
+    <!-- الخطوة 2: تعبئة الاستبيان -->
+    <div id="step-fill" class="step-hidden">
+      <button class="btn btn-sm btn-outline-secondary mb-3" onclick="backToList()">
+        <i class="bi bi-arrow-right"></i> رجوع لقائمة الاستبيانات
+      </button>
+      <div class="card-custom p-4 mb-3">
+        <h5 class="fw-bold text-primary" id="fillSurveyTitle"></h5>
+        <p class="text-muted small" id="fillSurveySignificance"></p>
+      </div>
+
+      <form id="surveyForm" onsubmit="handleSubmit(event)">
+        <div class="card-custom p-3 mb-3">
+          <label class="form-label fw-bold">الكلية (اختياري)</label>
+          <select id="fillCollege" class="form-select">
+            <option value="">تفضّل بعدم التحديد</option>
+            <option value="كلية التربية">كلية التربية</option>
+            <option value="كلية العلوم الإدارية">كلية العلوم الإدارية</option>
+            <option value="كلية القانون">كلية القانون</option>
+            <option value="كلية علوم الحاسوب وتقنية المعلومات">كلية علوم الحاسوب وتقنية المعلومات</option>
+            <option value="كلية الاقتصاد الإسلامي">كلية الاقتصاد الإسلامي</option>
+            <option value="كلية اللغات">كلية اللغات</option>
+            <option value="كلية الإعلام">كلية الإعلام</option>
+            <option value="الدراسات العليا">الدراسات العليا</option>
+          </select>
+        </div>
+
+        <div id="questionsContainer" class="d-flex flex-column gap-3"></div>
+
+        <button type="submit" id="submitBtn" class="btn btn-gold w-100 py-3 mt-4 fw-bold fs-6">
+          <i class="bi bi-send-check"></i> إرسال إجاباتي
+        </button>
+      </form>
+    </div>
+
+    <!-- الخطوة 3: شكراً -->
+    <div id="step-thanks" class="step-hidden text-center py-5">
+      <i class="bi bi-check-circle-fill text-success" style="font-size: 4rem;"></i>
+      <h4 class="fw-bold mt-3">شكراً لمشاركتك!</h4>
+      <p class="text-muted">تم استلام إجاباتك بنجاح وستُستخدم في تحسين جودة الخدمات الأكاديمية.</p>
+      <button class="btn btn-gold px-4 mt-2" onclick="backToList()">تعبئة استبيان آخر</button>
+    </div>
+
+  </div>
+
+  <script>
+    // نفس رابط الخادم الموحّد المستخدم في بقية الأنظمة
+    const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbz8NXiXZLwkLoGNPz0pweO9iwkK9DUZExQ1Ngx6ricrVYrsldWtQGIEIApZLFKUKYjy/exec';
+
+    // نسخة احتياطية محلية (نفس بنك الاستبيانات العشرة) تُستخدم فوراً بينما
+    // يجري التحقق من الاتصال بالخادم، ولضمان عمل الصفحة حتى لو تأخر الرد
+    const EMBEDDED_SURVEYS = [{"id":"STU","code":"ISSS-STU","title":"استبيان رضا الطلبة عن التجربة التعليمية","targetGroup":"الطلبة","significance":"قياس جودة التجربة التعليمية والخدمات الأكاديمية والدعم الذي يتلقاه الطالب وتحديد أولويات التحسين.","questions":[["التعليم والتعلم","وضوح التدريس","أوضح لي عضو هيئة التدريس أهداف المقرر ومتطلباته منذ البداية."],["التعليم والتعلم","جودة التدريس","يقدم عضو هيئة التدريس المادة بطريقة تساعدني على الفهم والتطبيق."],["التعليم والتعلم","التقويم","تعكس أساليب التقويم ما تم تعلمه في المقرر بصورة عادلة."],["المقرر والمحتوى","ملاءمة المحتوى","محتوى المقرر مناسب لمستوى البرنامج واحتياجاتي التعليمية."],["المقرر والمحتوى","تحديث المحتوى","يحتوي المقرر على أمثلة أو تطبيقات حديثة ومرتبطة بالتخصص."],["الدعم الأكاديمي","الإرشاد","أحصل على إرشاد أكاديمي واضح عند الحاجة."],["الخدمات التعليمية","الخدمات الإلكترونية","الخدمات والمنصات الإلكترونية اللازمة للدراسة متاحة وسهلة الاستخدام."],["مصادر التعلم","إتاحة المصادر","أستطيع الوصول إلى مصادر التعلم التي أحتاجها في الوقت المناسب."],["البيئة الجامعية","العدالة والاحترام","أتعامل مع أعضاء الجامعة باحترام وعدالة دون تمييز."],["الرضا العام","القيمة التعليمية","أرى أن تجربتي التعليمية تحقق قيمة وفائدة تتناسب مع أهداف البرنامج."]]},{"id":"FAC","code":"ISSS-FAC","title":"استبيان رضا أعضاء هيئة التدريس","targetGroup":"أعضاء هيئة التدريس","significance":"قياس بيئة العمل الأكاديمية والدعم المؤسسي والموارد وفرص التطوير بما يدعم جودة التعليم والبحث.","questions":[["بيئة العمل","الوضوح المؤسسي","السياسات والإجراءات الأكاديمية واضحة بالنسبة لي."],["بيئة العمل","العدالة","توزيع الأعباء والمهام الأكاديمية يتم بصورة عادلة."],["التدريس","الدعم التدريسي","أحصل على الدعم اللازم لتنفيذ التدريس بكفاءة."],["التدريس","التقويم","تتوفر آليات واضحة لتحسين جودة التقويم والتغذية الراجعة للطلبة."],["الموارد","مصادر التعلم","تتوفر الموارد والمصادر اللازمة لتدريس مقرراتي."],["التقنية","الأنظمة الإلكترونية","الأنظمة والمنصات الإلكترونية تدعم عملي الأكاديمي بكفاءة."],["التطوير المهني","التدريب","تتوفر فرص مناسبة للتطوير المهني والتدريب."],["البحث والابتكار","الدعم البحثي","تحصل أنشطة البحث والابتكار على دعم مؤسسي مناسب."],["المشاركة","صوت عضو هيئة التدريس","تتاح لي قنوات فعالة للمشاركة في القرارات الأكاديمية ذات الصلة."],["الرضا العام","التمكين الأكاديمي","أشعر أن بيئة العمل تمكنني من أداء دوري الأكاديمي بجودة عالية."]]},{"id":"GRD","code":"ISSS-GRD","title":"استبيان الخريجين عن جودة البرنامج","targetGroup":"الخريجون","significance":"قياس مدى استفادة الخريجين من مخرجات البرنامج وملاءمتها للحياة المهنية والتعلم المستمر.","questions":[["مخرجات التعلم","المعارف التخصصية","أكسبني البرنامج المعارف الأساسية اللازمة في تخصصي."],["مخرجات التعلم","المهارات التطبيقية","أكسبني البرنامج مهارات عملية يمكن استخدامها في العمل."],["مخرجات التعلم","التفكير النقدي","طور البرنامج قدرتي على التحليل وحل المشكلات."],["مخرجات التعلم","التواصل","طور البرنامج مهاراتي في التواصل والعمل مع الآخرين."],["البرنامج","ترابط المقررات","كانت المقررات مترابطة ومنظمة بما يخدم أهداف البرنامج."],["البرنامج","الملاءمة المهنية","كانت محتويات البرنامج مرتبطة باحتياجات سوق العمل."],["التدريب","الخبرة التطبيقية","أتاح البرنامج فرصًا كافية للتطبيق أو التدريب العملي."],["الخدمات","الإرشاد المهني","حصلت على توجيه مناسب يساعدني في الانتقال إلى الحياة المهنية."],["التعلم المستمر","قابلية التطوير","ساعدني البرنامج على مواصلة التعلم وتطوير نفسي بعد التخرج."],["الرضا العام","تحقيق التوقعات","لبّى البرنامج توقعاتي الأكاديمية والمهنية بدرجة جيدة."]]},{"id":"EMP","code":"ISSS-EMP","title":"استبيان أصحاب العمل عن الخريجين","targetGroup":"أصحاب العمل","significance":"قياس جودة خريجي الجامعة من منظور جهات التوظيف ومدى توافق كفاءاتهم مع متطلبات العمل.","questions":[["الكفاءة المهنية","المعرفة التخصصية","يمتلك خريجو الجامعة المعرفة التخصصية المناسبة لمهامهم."],["الكفاءة المهنية","التطبيق","يستطيع الخريج تطبيق ما تعلمه على مشكلات العمل الواقعية."],["المهارات","حل المشكلات","يتمتع الخريج بقدرة جيدة على تحليل المشكلات وحلها."],["المهارات","التواصل","يتواصل الخريج بوضوح وفاعلية مع الزملاء والمستفيدين."],["المهارات","العمل الجماعي","يعمل الخريج بكفاءة ضمن فريق."],["السلوك المهني","الالتزام","يظهر الخريج مستوى مناسبًا من الانضباط والمسؤولية المهنية."],["السلوك المهني","الأخلاقيات","يلتزم الخريج بالسلوك والأخلاقيات المهنية."],["التكيف","التعلم والتطوير","يستجيب الخريج للتغيير ويستطيع تعلم مهارات جديدة."],["البرنامج","ملاءمة المخرجات","تتوافق كفاءات الخريجين عمومًا مع احتياجات جهة العمل."],["الرضا العام","قابلية التوظيف","أرى أن خريجي البرنامج مؤهلون للنجاح في بيئة العمل."]]},{"id":"CRS","code":"ISSS-CRS","title":"استبيان تقييم المقرر الدراسي","targetGroup":"الطلبة","significance":"تقييم المقرر من حيث أهدافه ومحتواه وطرائق تدريسه وتقويمه ومصادره.","questions":[["أهداف المقرر","الوضوح","أهداف المقرر واضحة ومعلنة لي."],["أهداف المقرر","الارتباط بالبرنامج","ترتبط أهداف المقرر بمخرجات البرنامج وتخصصه."],["المحتوى","التنظيم","محتوى المقرر منظم ومتدرج بصورة منطقية."],["المحتوى","الملاءمة","محتوى المقرر مناسب للوقت والمستوى الدراسي."],["التدريس","الشرح","تساعد طريقة تدريس المقرر على تحقيق أهدافه."],["التدريس","التفاعل","توجد فرص مناسبة للمناقشة والتفاعل والتطبيق."],["التقويم","العدالة","التقويم عادل وواضح ومتسق مع أهداف المقرر."],["التغذية الراجعة","الاستفادة","أتلقى تغذية راجعة تساعدني على تحسين تعلمي."],["المصادر","الإتاحة","مصادر التعلم المطلوبة للمقرر متاحة ويمكن الوصول إليها."],["الرضا العام","جودة المقرر","أقيّم جودة المقرر بصورة إيجابية في مجمله."]]},{"id":"ADV","code":"ISSS-ADV","title":"استبيان الإرشاد والدعم الأكاديمي","targetGroup":"الطلبة","significance":"قياس فاعلية الإرشاد الأكاديمي وسهولة الوصول إلى الدعم ومساهمته في نجاح الطالب.","questions":[["الإرشاد","وضوح الخطة","أفهم متطلبات خطتي الدراسية ومساري الأكاديمي."],["الإرشاد","الاستجابة","يمكنني الوصول إلى المرشد الأكاديمي عند الحاجة."],["الإرشاد","جودة المشورة","المشورة التي أتلقاها مناسبة لوضعي الأكاديمي."],["الإرشاد","اختيار المقررات","يساعدني الإرشاد في اختيار المقررات المناسبة."],["الدعم","التعثر الأكاديمي","توجد آليات واضحة لدعم الطلبة المتعثرين أكاديميًا."],["الدعم","الإحالة","يتم توجيهي إلى الجهة المناسبة عندما أحتاج إلى خدمة متخصصة."],["المعلومات","الشفافية","المعلومات المتعلقة باللوائح والمتطلبات الأكاديمية متاحة بوضوح."],["الخدمات","السرعة","يتم التعامل مع طلبات الدعم الأكاديمي في وقت مناسب."],["العدالة","المساواة","أحصل على خدمات الإرشاد والدعم بصورة عادلة."],["الأثر","تحسين المسار","يسهم الإرشاد والدعم في تحسين قراراتي ومساري الأكاديمي."]]},{"id":"ESV","code":"ISSS-ESV","title":"استبيان الخدمات الإلكترونية والتحول الرقمي","targetGroup":"الطلبة وأعضاء هيئة التدريس","significance":"قياس سهولة وموثوقية الخدمات الرقمية ومدى دعمها للعملية التعليمية والإدارية.","questions":[["سهولة الاستخدام","الوضوح","واجهات الأنظمة الإلكترونية واضحة وسهلة الاستخدام."],["سهولة الاستخدام","الوصول","أستطيع الوصول إلى الخدمات الرقمية دون تعقيد غير ضروري."],["الموثوقية","الاستقرار","تعمل الأنظمة الإلكترونية بصورة مستقرة أثناء الاستخدام."],["الأداء","السرعة","تستجيب الخدمات الإلكترونية في وقت مناسب."],["التكامل","ترابط الخدمات","تعمل الأنظمة والخدمات الرقمية بصورة مترابطة عند الحاجة."],["المحتوى","دقة المعلومات","المعلومات والبيانات المعروضة في الخدمات الرقمية دقيقة ومحدثة."],["الدعم الفني","المساندة","أحصل على دعم فني مناسب عند حدوث مشكلة."],["الأمان","الثقة","أشعر بالثقة في حماية بياناتي عند استخدام الخدمات الإلكترونية."],["الإتاحة","المرونة","يمكنني استخدام الخدمات الرقمية من الأجهزة والأوقات المناسبة لي."],["الأثر","تحسين الخدمة","تسهم الخدمات الإلكترونية في تقليل الوقت والجهد وتحسين تجربتي."]]},{"id":"LIB","code":"ISSS-LIB","title":"استبيان مصادر التعلم والمكتبة والخدمات المساندة","targetGroup":"الطلبة وأعضاء هيئة التدريس","significance":"قياس كفاية مصادر التعلم والخدمات المساندة وسهولة الوصول إليها وجودتها.","questions":[["المصادر","الكفاية","تتوفر مصادر تعلم كافية لدعم مقرراتي أو عملي الأكاديمي."],["المصادر","الحداثة","المصادر المتاحة محدثة وملائمة للتخصص."],["الوصول","سهولة الوصول","أستطيع الوصول إلى مصادر التعلم بسهولة."],["المكتبة","الخدمات","خدمات المكتبة تلبي احتياجاتي الأكاديمية."],["الإلكترونية","المصادر الرقمية","تتوفر مصادر إلكترونية مناسبة ومتاحة عند الحاجة."],["الدعم","المساعدة","أحصل على مساعدة مناسبة في الوصول إلى المصادر واستخدامها."],["البيئة","ملاءمة البيئة","بيئة التعلم والمكتبة مناسبة للدراسة أو العمل الأكاديمي."],["العدالة","الإتاحة المتساوية","تتاح مصادر التعلم والخدمات المساندة بصورة عادلة للمستفيدين."],["الكفاءة","توفير الوقت","تساعد الخدمات والمصادر المتاحة على إنجاز المهام بكفاءة."],["الرضا العام","جودة المصادر","أنا راضٍ عمومًا عن جودة مصادر التعلم والخدمات المساندة."]]},{"id":"ADM","code":"ISSS-ADM","title":"استبيان الخدمات الإدارية وتجربة المستفيد","targetGroup":"المستفيدون","significance":"قياس جودة الخدمات الإدارية وسرعة الاستجابة والشفافية وسهولة الإجراءات.","questions":[["الإجراءات","الوضوح","إجراءات الحصول على الخدمة واضحة ومفهومة."],["الإجراءات","البساطة","الإجراءات المطلوبة للحصول على الخدمة بسيطة ومناسبة."],["السرعة","الوقت","يتم إنجاز الخدمة في وقت مناسب."],["الاستجابة","المتابعة","أحصل على متابعة مناسبة لطلب الخدمة."],["الموظفون","الاحترام","يتعامل موظفو الخدمة معي باحترام ومهنية."],["الموظفون","الكفاءة","يمتلك موظفو الخدمة المعرفة اللازمة للإجابة عن استفساراتي."],["الشفافية","المعلومات","المعلومات المتعلقة بالرسوم والمتطلبات والمدة واضحة."],["العدالة","المساواة","تقدم الخدمة وفق معايير عادلة ومتساوية."],["التظلمات","معالجة الشكاوى","توجد قناة واضحة لتقديم الشكاوى أو التظلمات ومتابعتها."],["الرضا العام","جودة الخدمة","أنا راضٍ عمومًا عن مستوى الخدمة الإدارية التي تلقيتها."]]},{"id":"QUL","code":"ISSS-QUL","title":"استبيان ثقافة الجودة والتحسين المستمر","targetGroup":"المستفيدون والعاملون","significance":"قياس مدى ترسخ ثقافة الجودة واستخدام البيانات والمشاركة في التحسين المستمر على مستوى المؤسسة.","questions":[["ثقافة الجودة","الوعي","أفهم بصورة عامة أهداف الجودة والتحسين في المؤسسة."],["التخطيط","وضوح الأولويات","أولويات التحسين في الجهة واضحة ومفهومة."],["البيانات","استخدام الأدلة","تستخدم البيانات والأدلة في اتخاذ قرارات التحسين."],["المشاركة","المساهمة","تتاح لي فرصة مناسبة للمشاركة في مبادرات التحسين."],["التغذية الراجعة","الاستجابة","تؤخذ الملاحظات والآراء الواردة من المستفيدين بجدية."],["التحسين","المتابعة","تتم متابعة إجراءات التحسين حتى معرفة نتائجها."],["المساءلة","المسؤولية","توجد مسؤوليات واضحة عن تنفيذ إجراءات التحسين."],["التواصل","إبلاغ النتائج","يتم إبلاغ المعنيين بنتائج التقييم وإجراءات التحسين ذات الصلة."],["التعلم المؤسسي","الاستفادة من النتائج","تستفيد الجهة من نتائج التقييم السابقة لتطوير أدائها."],["الأثر","التحسن المستمر","ألاحظ تحسنًا فعليًا في الخدمات أو العمليات نتيجة جهود الجودة."]]}];
+
+    // الاستبيانات الموجّهة للطلاب تحديداً (تحتوي "الطلبة" ضمن الفئة المستهدفة)
+    const STUDENT_SURVEYS = EMBEDDED_SURVEYS.filter(s => s.targetGroup && s.targetGroup.indexOf('الطلبة') !== -1);
+
+    let currentSurvey = null;
+    let currentQuestions = [];
+
+    function callBackend(action, payload) {
+      const url = WEB_APP_URL + '?system=survey&action=' + encodeURIComponent(action)
+        + '&payload=' + encodeURIComponent(JSON.stringify(payload || {}));
+      return fetch(url, { method: 'GET' }).then(r => r.json());
+    }
+
+    function renderSurveysGrid() {
+      const grid = document.getElementById('surveysGrid');
+      grid.innerHTML = '';
+      STUDENT_SURVEYS.forEach(s => {
+        grid.innerHTML += `
+          <div class="col-md-6 mb-3">
+            <div class="card-custom p-3 survey-card h-100" onclick="openSurvey('${s.id}')">
+              <span class="badge bg-dark align-self-start mb-2">${s.code}</span>
+              <h6 class="fw-bold text-primary">${s.title}</h6>
+              <p class="text-muted small mb-2">${s.significance}</p>
+              <span class="btn btn-sm btn-outline-primary mt-auto">ابدأ التعبئة <i class="bi bi-arrow-left"></i></span>
+            </div>
+          </div>`;
+      });
+    }
+
+    function openSurvey(surveyId) {
+      const s = STUDENT_SURVEYS.find(x => x.id === surveyId);
+      if (!s) return;
+      currentSurvey = s;
+
+      // الأسئلة مضمّنة محلياً بصيغة [dimension, indicator, text] — نحوّلها لكائنات بمعرّف ثابت
+      currentQuestions = s.questions.map((q, idx) => ({
+        id: s.id + '-' + String(idx + 1).padStart(2, '0'), dimension: q[0], indicator: q[1], text: q[2]
+      }));
+
+      document.getElementById('fillSurveyTitle').textContent = s.title;
+      document.getElementById('fillSurveySignificance').textContent = s.significance;
+
+      const container = document.getElementById('questionsContainer');
+      container.innerHTML = '';
+      currentQuestions.forEach((q, idx) => {
+        container.innerHTML += `
+          <div class="q-block p-3">
+            <div class="fw-bold mb-1">${idx + 1}. ${q.text}</div>
+            <div class="likert-label mb-2">${q.dimension} — ${q.indicator}</div>
+            <div class="d-flex flex-wrap gap-3 align-items-center">
+              ${[1,2,3,4,5].map(v => `
+                <div class="form-check">
+                  <input class="form-check-input" type="radio" name="q_${q.id}" id="q_${q.id}_${v}" value="${v}" required>
+                  <label class="form-check-label likert-label" for="q_${q.id}_${v}">${v}</label>
+                </div>`).join('')}
+              <div class="form-check ms-auto">
+                <input class="form-check-input" type="checkbox" id="na_${q.id}" onchange="toggleNA('${q.id}')">
+                <label class="form-check-label likert-label" for="na_${q.id}">لا ينطبق</label>
+              </div>
+            </div>
+          </div>`;
+      });
+
+      showStep('fill');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function toggleNA(qId) {
+      const checked = document.getElementById('na_' + qId).checked;
+      document.getElementsByName('q_' + qId).forEach(r => {
+        r.disabled = checked;
+        if (checked) r.checked = false;
+      });
+    }
+
+    function handleSubmit(e) {
+      e.preventDefault();
+      const college = document.getElementById('fillCollege').value;
+      const answers = currentQuestions.map(q => {
+        const isNA = document.getElementById('na_' + q.id).checked;
+        let val = '';
+        if (!isNA) {
+          const checked = document.querySelector('input[name="q_' + q.id + '"]:checked');
+          val = checked ? checked.value : '';
+        }
+        return { questionId: q.id, scoreValue: val, isNA: isNA };
+      });
+
+      const btn = document.getElementById('submitBtn');
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> جاري الإرسال...';
+
+      callBackend('submitResponse', { surveyId: currentSurvey.id, college: college, answers: answers })
+        .then(res => {
+          if (res && res.success) {
+            showStep('thanks');
+          } else {
+            alert((res && res.message) || 'تعذر إرسال الإجابات، حاول مرة أخرى.');
+          }
+        })
+        .catch(() => alert('تعذر الاتصال بالخادم. تأكد من اتصالك بالإنترنت وحاول مرة أخرى.'))
+        .finally(() => {
+          btn.disabled = false;
+          btn.innerHTML = '<i class="bi bi-send-check"></i> إرسال إجاباتي';
+        });
+    }
+
+    function showStep(step) {
+      ['list', 'fill', 'thanks'].forEach(s => {
+        document.getElementById('step-' + s).classList.toggle('step-hidden', s !== step);
+      });
+    }
+
+    function backToList() {
+      document.getElementById('surveyForm').reset();
+      showStep('list');
+    }
+
+    // عرض القائمة فوراً من النسخة المضمّنة (بدون انتظار الشبكة)
+    renderSurveysGrid();
+    document.getElementById('loadingOverlay').remove();
+  </script>
+</body>
+</html>
