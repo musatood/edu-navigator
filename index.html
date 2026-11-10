@@ -1155,6 +1155,7 @@
                 '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:14px;">' +
                 '<select id="rpDRange" style="' + inp + '"><option value="1">آخر يوم</option><option value="7" selected>آخر أسبوع</option><option value="30">آخر شهر</option></select>' +
                 '<button onclick="rpDeanPreview()" style="' + btn + 'background:#e2e8f0;color:#0f172a;">معاينة تقرير الكلية المختارة</button>' +
+                '<button onclick="rpDeanSendOne()" style="' + btn + 'background:#1e3a5f;color:#fff;">إرسال للكلية المختارة فقط</button>' +
                 '<button onclick="rpDeanSendNow()" style="' + btn + 'background:#c5a059;color:#0f172a;">إرسال الآن لكل العمداء</button></div>' +
                 '<pre id="rpDeanPreview" style="display:none;white-space:pre-wrap;direction:rtl;background:#0f172a;color:#e2e8f0;border-radius:10px;padding:14px;margin:12px 0 0;font-family:inherit;font-size:13px;line-height:1.8;max-height:380px;overflow:auto;"></pre></div>' +
 
@@ -1400,6 +1401,16 @@
             const pre = document.getElementById('rpDeanPreview');
             pre.style.display = 'block'; pre.textContent = res.text.replace(/\*/g, '');
             rpMsg('معاينة فقط — لم يُرسل شيء.', false);
+        }
+
+        async function rpDeanSendOne() {
+            const college = document.getElementById('rpDCollege').value;
+            if (!confirm('إرسال تقرير «' + college + '» إلى عميد هذه الكلية فقط عبر واتساب الآن؟')) return;
+            rpMsg('جارٍ إرسال تقرير ' + college + ' — لا تغلق الصفحة...', false);
+            const res = await rpApi({ action: 'sendDeans', colleges: [college], days: Number(document.getElementById('rpDRange').value) });
+            if (res.ok) rpMsg('تم إرسال تقرير ' + college + ' (' + res.period + ').', false);
+            else rpMsg((res.error || 'فشل الإرسال') + (res.sent !== undefined ? ' — نجح: ' + res.sent + ' / فشل: ' + res.failed : ''), true);
+            rpRefresh();
         }
 
         async function rpDeanSendNow() {
