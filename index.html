@@ -342,6 +342,61 @@
 
         let coursesMgmtSelectedCollege = null;
         let coursesMgmtSelectedProgramIdx = 0;
+        let coursesMgmtSearchQuery = '';
+        let coursesMgmtFlashTarget = null;
+
+        // توحيد النص العربي للبحث (تجاهل التشكيل والهمزات والتاء المربوطة...)
+        function cmgNorm(s) {
+            return String(s || '').toLowerCase()
+                .replace(/[\u064B-\u065F\u0670\u0640]/g, '')
+                .replace(/[أإآٱ]/g, 'ا')
+                .replace(/ى/g, 'ي')
+                .replace(/ة/g, 'ه')
+                .replace(/\s+/g, ' ')
+                .trim();
+        }
+
+        // يبحث في كل الكليات والبرامج (أو كلية المستخدم فقط) ويعيد النتائج
+        function cmgSearchCourses(query) {
+            const words = cmgNorm(query).split(' ').filter(Boolean);
+            const out = [];
+            if (!words.length) return out;
+            const colleges = (isCoursesMgmtScopedToOwnCollege() && hubUser && hubUser.college)
+                ? [hubUser.college] : HUB_COLLEGES_LIST;
+            colleges.forEach(function (col) {
+                (HUB_COURSES_DB[col] || []).forEach(function (p, pi) {
+                    (p.courses || []).forEach(function (c, ci) {
+                        const n = cmgNorm(c);
+                        if (words.every(function (w) { return n.indexOf(w) !== -1; })) {
+                            out.push({ college: col, pi: pi, ci: ci, program: p.program, name: c });
+                        }
+                    });
+                });
+            });
+            return out;
+        }
+
+        function cmgResultsHtml(query) {
+            const q = (query || '').trim();
+            if (!q) return '';
+            const res = cmgSearchCourses(q);
+            if (!res.length) return '<p style="padding:14px;color:#94a3b8;font-size:13px;margin:0;">لا توجد مقررات مطابقة لـ \"' + escapeHtml(q) + '\".</p>';
+            const LIMIT = 100;
+            let h = '<div style="font-size:12.5px;color:#64748b;margin-bottom:8px;">عدد النتائج: <b>' + res.length + '</b>' + (res.length > LIMIT ? ' (يُعرض أول ' + LIMIT + ' — دقّق البحث لتضييق النتائج)' : '') + '</div>';
+            h += '<div style="max-height:460px;overflow:auto;border:1px solid #e2e8f0;border-radius:10px;">';
+            res.slice(0, LIMIT).forEach(function (r) {
+                const d = 'data-col="' + escapeHtml(r.college) + '" data-pi="' + r.pi + '" data-ci="' + r.ci + '"';
+                h += '<div style="display:flex;align-items:center;gap:8px;padding:9px 12px;border-bottom:1px solid #f1f5f9;">';
+                h += '<div style="flex:1;"><div style="font-size:13.5px;color:#1e293b;font-weight:600;">' + escapeHtml(r.name) + '</div>';
+                h += '<div style="font-size:11.5px;color:#64748b;margin-top:2px;">' + escapeHtml(r.college) + ' ‹ ' + escapeHtml(r.program) + '</div></div>';
+                h += '<button class="cmgSrGoBtn" ' + d + ' style="background:#ecfdf5;color:#047857;border:none;padding:6px 10px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:700;">انتقال</button>';
+                h += '<button class="cmgSrEditBtn" ' + d + ' style="background:#e0f2fe;color:#0369a1;border:none;padding:6px 10px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:700;">تعديل</button>';
+                h += '<button class="cmgSrDelBtn" ' + d + ' style="background:#fee2e2;color:#dc2626;border:none;padding:6px 10px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:700;">حذف</button>';
+                h += '</div>';
+            });
+            h += '</div>';
+            return h;
+        }
 
         // العميد ورئيس القسم: يُقيَّد نطاقهما على كليتهما فقط (لا يمكنهما رؤية
         // أو تعديل كليات أخرى، ولا إضافة/حذف كليات جديدة بالكامل). مدير
@@ -373,6 +428,15 @@
                 html += '<p style="color:#64748b;font-size:13px;margin-bottom:20px;">إضافة / تعديل / حذف الكليات والبرامج والمقررات — يُطبَّق التغيير فورًا على بطاقة صحة المقرر ونظام الحوكمة وجودة المناهج.</p>';
             }
 
+            html += '<div style="background:#fff;border-radius:14px;padding:16px;margin-bottom:16px;box-shadow:0 2px 8px rgba(0,0,0,.06);">';
+            html += '<div style="position:relative;display:flex;align-items:center;">';
+            html += '<span style="position:absolute;right:12px;font-size:16px;pointer-events:none;">🔍</span>';
+            html += '<input id="cmgSearchInput" type="search" autocomplete="off" placeholder="ابحث عن مقرر بالاسم (في كل الكليات والبرامج)..." value="' + escapeHtml(coursesMgmtSearchQuery) + '" style="width:100%;padding:12px 40px 12px 12px;border-radius:10px;border:2px solid #cbd5e1;font-family:Cairo,sans-serif;font-size:14px;">';
+            html += '</div>';
+            html += '<div id="cmgSearchResults" style="margin-top:' + (coursesMgmtSearchQuery.trim() ? '12' : '0') + 'px;">' + cmgResultsHtml(coursesMgmtSearchQuery) + '</div>';
+            html += '</div>';
+
+            html += '<div id="cmgBrowse" style="' + (coursesMgmtSearchQuery.trim() ? 'display:none;' : '') + '">';
             html += '<div style="background:#fff;border-radius:14px;padding:16px;margin-bottom:16px;box-shadow:0 2px 8px rgba(0,0,0,.06);display:flex;gap:10px;align-items:center;flex-wrap:wrap;">';
             html += '<label style="font-weight:700;color:#334155;">الكلية:</label>';
             if (scoped) {
@@ -417,7 +481,7 @@
                 const courses = curProg.courses;
                 html += '<div style="max-height:360px;overflow:auto;border:1px solid #e2e8f0;border-radius:10px;">';
                 courses.forEach(function (c, i) {
-                    html += '<div style="display:flex;align-items:center;gap:8px;padding:9px 12px;border-bottom:1px solid #f1f5f9;">';
+                    html += '<div id="cmgRow' + i + '" style="display:flex;align-items:center;gap:8px;padding:9px 12px;border-bottom:1px solid #f1f5f9;">';
                     html += '<span style="flex:1;font-size:13.5px;color:#334155;">' + escapeHtml(c) + '</span>';
                     html += '<button class="cmgEditCourseBtn" data-idx="' + i + '" style="background:#e0f2fe;color:#0369a1;border:none;padding:6px 10px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:700;">تعديل</button>';
                     html += '<button class="cmgDeleteCourseBtn" data-idx="' + i + '" style="background:#fee2e2;color:#dc2626;border:none;padding:6px 10px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:700;">حذف</button>';
@@ -434,6 +498,7 @@
                 html += '<p style="color:#94a3b8;font-size:13px;">اختر أو أضف برنامجًا أولًا لإدارة مقرراته.</p>';
             }
             html += '</div>';
+            html += '</div>'; // cmgBrowse
 
             html += '<p style="color:#94a3b8;font-size:11.5px;margin-top:14px;">تُحفظ التعديلات في متصفحك الحالي وتُطبَّق فورًا على الأنظمة المفتوحة بالفعل. لنقل التعديلات لجهاز آخر استخدم التصدير/الاستيراد أدناه.</p>';
             html += '<div style="display:flex;gap:8px;margin-top:8px;">';
@@ -445,9 +510,44 @@
 
             root.innerHTML = html;
             wireCoursesMgmtEvents(programs);
+            if (coursesMgmtFlashTarget !== null) {
+                const row = document.getElementById('cmgRow' + coursesMgmtFlashTarget);
+                coursesMgmtFlashTarget = null;
+                if (row) {
+                    row.scrollIntoView({ block: 'center', behavior: 'smooth' });
+                    row.style.transition = 'background .6s';
+                    row.style.background = '#fef08a';
+                    setTimeout(function () { row.style.background = ''; }, 2200);
+                }
+            }
         }
 
         function wireCoursesMgmtEvents(programs) {
+            const searchInput = document.getElementById('cmgSearchInput');
+            if (searchInput) {
+                if (coursesMgmtSearchQuery) {
+                    searchInput.focus();
+                    const L = searchInput.value.length;
+                    try { searchInput.setSelectionRange(L, L); } catch (e) {}
+                }
+                searchInput.addEventListener('input', function () {
+                    coursesMgmtSearchQuery = searchInput.value;
+                    const has = !!coursesMgmtSearchQuery.trim();
+                    const box = document.getElementById('cmgSearchResults');
+                    const browse = document.getElementById('cmgBrowse');
+                    if (browse) browse.style.display = has ? 'none' : '';
+                    if (box) {
+                        box.style.marginTop = has ? '12px' : '0';
+                        box.innerHTML = cmgResultsHtml(coursesMgmtSearchQuery);
+                        wireCmgSearchResultButtons();
+                    }
+                });
+                searchInput.addEventListener('keydown', function (e) {
+                    if (e.key === 'Escape') { searchInput.value = ''; searchInput.dispatchEvent(new Event('input')); }
+                });
+            }
+            wireCmgSearchResultButtons();
+
             const collegeSelect = document.getElementById('cmgCollegeSelect');
             if (collegeSelect) collegeSelect.addEventListener('change', function (e) {
                 coursesMgmtSelectedCollege = e.target.value;
@@ -590,6 +690,50 @@
                     reader.readAsText(file);
                 });
             }
+        }
+
+        function wireCmgSearchResultButtons() {
+            function target(btn) {
+                const col = btn.getAttribute('data-col');
+                const pi = parseInt(btn.getAttribute('data-pi'), 10);
+                const ci = parseInt(btn.getAttribute('data-ci'), 10);
+                const prog = (HUB_COURSES_DB[col] || [])[pi];
+                return { col: col, pi: pi, ci: ci, prog: prog };
+            }
+            document.querySelectorAll('.cmgSrGoBtn').forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    const t = target(btn);
+                    if (!t.prog) return;
+                    coursesMgmtSelectedCollege = t.col;
+                    coursesMgmtSelectedProgramIdx = t.pi;
+                    coursesMgmtFlashTarget = t.ci;
+                    coursesMgmtSearchQuery = '';
+                    renderCoursesMgmt();
+                });
+            });
+            document.querySelectorAll('.cmgSrEditBtn').forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    const t = target(btn);
+                    if (!t.prog) return;
+                    const name = prompt('تعديل اسم المقرر:', t.prog.courses[t.ci]);
+                    if (name === null) return;
+                    const trimmed = name.trim();
+                    if (!trimmed) return;
+                    t.prog.courses[t.ci] = trimmed;
+                    saveCoursesChange();
+                    renderCoursesMgmt();
+                });
+            });
+            document.querySelectorAll('.cmgSrDelBtn').forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    const t = target(btn);
+                    if (!t.prog) return;
+                    if (!confirm('حذف المقرر "' + t.prog.courses[t.ci] + '"؟')) return;
+                    t.prog.courses.splice(t.ci, 1);
+                    saveCoursesChange();
+                    renderCoursesMgmt();
+                });
+            });
         }
 
         const loadedFrames = {};
